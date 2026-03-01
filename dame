@@ -1,0 +1,363 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <title>Overlay OBS - Emuladores + Eaglercraft + Memes</title>
+    <style>
+        /* Fundo preto */
+        body { margin: 0; padding: 0; background-color: #000; overflow: hidden; font-family: 'Arial Black', sans-serif; }
+
+        /* --- CAMADA 1: O JOGO (FUNDO) --- */
+        #game-wrapper {
+            position: absolute;
+            top: 0; left: 0;
+            width: 100vw; height: 100vh;
+            z-index: 1; /* Fica atrás */
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            background-color: #000;
+        }
+
+        /* Onde o emulador vai renderizar */
+        #game {
+            width: 100%;
+            height: 100%;
+        }
+
+        /* Iframe para o Eaglercraft */
+        #eaglercraft-frame {
+            width: 100vw;
+            height: 100vh;
+            border: none;
+            display: none; /* Escondido por padrão */
+        }
+
+        /* --- MENUS E BOTÕES (PARA INTERAGIR NO OBS) --- */
+        #menu-inicial {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.9); z-index: 10000;
+            display: flex; flex-direction: column; 
+            justify-content: center; align-items: center; color: white;
+            text-align: center;
+        }
+
+        .select-console {
+            margin: 20px 0;
+            padding: 10px;
+            font-size: 18px;
+            font-weight: bold;
+            background-color: #333;
+            color: white;
+            border: 2px solid white;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+
+        .btn-carregar {
+            margin-top: 10px;
+            padding: 15px 30px;
+            font-size: 20px;
+            font-weight: bold;
+            color: white;
+            background-color: #ff0055;
+            border: 4px solid white;
+            cursor: pointer;
+            text-transform: uppercase;
+            border-radius: 5px;
+        }
+        
+        .btn-carregar:hover { background-color: #ff3377; }
+
+        input[type="file"] { display: none; }
+
+        /* --- CAMADA 2: MEMES E SUSTOS (FRENTE) --- */
+        #susto-container {
+            display: none; position: absolute; top: 0; left: 0; width: 100vw; height: 100vh; z-index: 5000;
+            pointer-events: none; /* Permite clicar no jogo através do susto */
+        }
+
+        #susto-imagem {
+            width: 100vw; height: 100vh; object-fit: fill;
+            animation: estourarNaTela 0.1s ease-out forwards, tremerForte 0.1s infinite 0.1s;
+        }
+
+        @keyframes estourarNaTela {
+            0% { transform: scale(0.2); opacity: 0; }
+            80% { transform: scale(1.1); opacity: 1; }
+            100% { transform: scale(1); opacity: 1; }
+        }
+
+        @keyframes tremerForte {
+            0% { transform: translate(4px, 4px) scale(1.01); }
+            25% { transform: translate(-4px, -4px) scale(1); }
+            50% { transform: translate(-4px, 4px) scale(1.02); }
+            75% { transform: translate(4px, -4px) scale(1); }
+            100% { transform: translate(0px, 0px) scale(1.01); }
+        }
+
+        /* --- LEGENDA --- */
+        #legenda-container {
+            position: absolute; bottom: 50px; width: 100%; text-align: center; z-index: 9999; pointer-events: none;
+        }
+
+        #texto-legenda {
+            font-size: 50px; color: white; text-transform: uppercase;
+            -webkit-text-stroke: 3px black; text-shadow: 4px 4px 0 #000;
+            background-color: rgba(0,0,0,0.5); padding: 10px 20px; border-radius: 10px; display: none;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- MENU INICIAL PARA CARREGAR A ROM / HTML -->
+    <div id="menu-inicial">
+        <h1>SISTEMA DE OVERLAY + EMULADORES</h1>
+        <p>1. Selecione o console ou Eaglercraft:</p>
+        
+        <!-- SELEÇÃO DE CONSOLE -->
+        <select id="select-console" class="select-console">
+            <option value="eaglercraft">Eaglercraft (Arquivo HTML do Minecraft)</option>
+            <option value="snes">Super Nintendo (SNES)</option>
+            <option value="nes">Nintendo 8-bits (NES)</option>
+            <option value="n64">Nintendo 64 (N64)</option>
+            <option value="psx">PlayStation 1 (PS1)</option>
+            <option value="gba">Game Boy Advance (GBA)</option>
+            <option value="segaMD">Mega Drive (Sega Genesis)</option>
+        </select>
+
+        <p>2. Clique no botão abaixo para escolher o arquivo no seu PC.</p>
+        
+        <!-- Input escondido com suporte ao .html adicionado -->
+        <input type="file" id="input-rom" accept=".smc, .sfc, .nes, .n64, .z64, .v64, .iso, .bin, .cue, .gba, .md, .gen, .zip, .html">
+        
+        <button class="btn-carregar" onclick="document.getElementById('input-rom').click()">
+            ESCOLHER ARQUIVO DO PC
+        </button>
+
+        <p style="color: yellow; font-size: 14px; margin-top: 20px;">
+            Dica: No OBS, clique com botão direito na fonte -> <b>Interagir</b> para jogar e habilitar a voz.
+        </p>
+    </div>
+
+    <!-- ONDE O JOGO VAI RODAR -->
+    <div id="game-wrapper">
+        <div id="game"></div>
+        <!-- Iframe para o Eaglercraft (Minecraft) -->
+        <iframe id="eaglercraft-frame" allow="fullscreen; pointer-lock"></iframe>
+    </div>
+
+    <!-- SOM DOS MEMES -->
+    <audio id="som-boom" src="vine.mp3"></audio>
+
+    <!-- CAMADA DOS MEMES -->
+    <div id="susto-container">
+        <img id="susto-imagem" src="" alt="Susto">
+    </div>
+
+    <!-- CAMADA DA LEGENDA -->
+    <div id="legenda-container">
+        <span id="texto-legenda"></span>
+    </div>
+
+    <!-- SCRIPT PRINCIPAL -->
+    <script>
+        const inputRom = document.getElementById('input-rom');
+        
+        inputRom.addEventListener('change', function(e) {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            const consoleSelecionado = document.getElementById('select-console').value;
+
+            // Esconde o menu e inicia a voz
+            document.getElementById('menu-inicial').style.display = 'none';
+            iniciarSistema();
+
+            if (consoleSelecionado === 'eaglercraft') {
+                // --- LÓGICA DO EAGLERCRAFT (HTML) ---
+                document.getElementById('game').style.display = 'none'; // Esconde div do emulador
+                
+                const iframe = document.getElementById('eaglercraft-frame');
+                const htmlUrl = URL.createObjectURL(file);
+                
+                iframe.src = htmlUrl;
+                iframe.style.display = 'block'; // Mostra o iframe
+                
+            } else {
+                // --- LÓGICA DOS EMULADORES ROM (EmulatorJS) ---
+                document.getElementById('eaglercraft-frame').style.display = 'none'; // Garante que o iframe tá escondido
+                const romUrl = URL.createObjectURL(file);
+
+                window.EJS_player = '#game';
+                window.EJS_core = consoleSelecionado; 
+                window.EJS_gameUrl = romUrl;
+                window.EJS_pathtodata = 'https://cdn.emulatorjs.org/stable/data/';
+                window.EJS_startOnLoaded = true;
+
+                const script = document.createElement('script');
+                script.src = 'https://cdn.emulatorjs.org/stable/data/loader.js';
+                document.body.appendChild(script);
+            }
+        });
+
+        // --- SISTEMA DE MEMES E VOZ ---
+        const IMAGENS_PC = {
+            "beleza": "beleza.png",
+            "boa": "beleza.png",
+            "okay": "beleza.png",
+            "ok": "beleza.png",
+            "sim": "beleza.png",
+            "boa": "beleza.png",
+            "não": "nao.png",
+            "morri": "morri.jpg",
+            "batata": "batata.png",
+            "opa": "opa.png",
+            "e aí": "opa.png",
+            "galerinha": "opa.png",
+            "pessoal": "opa.png",
+            "oi": "opa.png",
+            "olá": "opa.png",
+            "tchau": "opa.png",
+            "bye": "opa.png",
+            "cachoeira": "cachoeira.png",
+            "louco": "louco.jpg",
+            "loucura": "louco.jpg",
+            "biruleibe": "louco.jpg",
+            "maluco": "louco.jpg",
+            "você": "vc.png",
+            "moeda": "moedinha.jpeg",
+            "moedinha": "moedinha.jpeg",
+            "calhambeque": "calhambeque.jfif",
+            "lá ele": "la ele.jpg",
+            "AH TÁ": "ata.png",
+            "entendi": "entendi.gif",
+            "vejo": "vi.jpg",
+            "vi": "vi.jpg",
+            "viu": "vi.jpg",
+            "ver": "vi.jpg",
+            "tá bom": "tabom.png",
+            "sei": "sei.jpg",
+            "sabe": "sei.jpg",
+            "saber": "sei.jpg",
+            "sabido": "sabido.png",
+            "perfeito": "perfeito.png",
+            "ideia": "ideia.png",
+            "certo": "certo.png",
+            "brega": "brega.png",
+            "genial": "genial.png",
+            "suave": "beleza.png",
+            "png": "png.avif",
+            "jpg": "png.avif",
+            "engraçado": "kakak.gif",
+            "deus": "mano.png",
+            "pensar": "pensamento 1.png",
+            "pensei": "pensamento 1.png",
+            "alô": "alo.png",
+            "amei": "GIF_AMEI.gif",
+            "eu": "eu.png",
+            "rapaz": "rapaz.png",
+            "jogar": "jogo.webp",
+            "jogo": "jogo.webp",
+            "ganhei": "uhul.png",
+            "calma": "calma.gif",
+            "espera": "calma.gif",
+            "zelda": "linkinpark.jfif",
+            "campeão": "campeão.png",
+            "1": "1.png",
+            "um": "1.png",
+            "2": "2.jpg",
+            "dois": "2.jpg",
+            "irineu": "irineu.png",
+            "dame tu cosita": "dame tu cosita.jpg",
+            "bravo": "bravo.jfif",
+            "irritado": "bravo.jfif",
+            "irritando": "bravo.jfif",
+            "irritar": "bravo.jfif",
+            "oxente": "oxente.jfif",
+            "oxe": "oxente.jfif",
+            "cinema": "cinema.png"
+        };
+
+        let cooldown = false;
+        let timerLegenda = null;
+
+        function iniciarSistema() {
+            const som = document.getElementById('som-boom');
+            som.volume = 0.1;
+            som.play().then(() => { som.pause(); som.currentTime = 0; }).catch(console.error);
+
+            preCarregarImagens();
+            configurarVoz();
+        }
+
+        function preCarregarImagens() {
+            for (let chave in IMAGENS_PC) {
+                const img = new Image();
+                img.src = IMAGENS_PC[chave];
+            }
+        }
+
+        function configurarVoz() {
+            const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+            
+            if (SpeechRecognition) {
+                const recognition = new SpeechRecognition();
+                recognition.lang = 'pt-BR';
+                recognition.continuous = true;
+                recognition.interimResults = true; 
+
+                recognition.onresult = (event) => {
+                    const result = event.results[event.resultIndex];
+                    const frase = result[0].transcript.trim().toLowerCase();
+                    mostrarLegenda(frase);
+                    verificarPC(frase);
+                };
+
+                recognition.onend = () => recognition.start();
+                recognition.start();
+            }
+        }
+
+        function mostrarLegenda(texto) {
+            const leg = document.getElementById('texto-legenda');
+            leg.innerText = texto;
+            leg.style.display = "inline-block";
+            if (timerLegenda) clearTimeout(timerLegenda);
+            timerLegenda = setTimeout(() => { leg.style.display = "none"; }, 3000);
+        }
+
+        function verificarPC(fraseOriginal) {
+            if (cooldown) return;
+            const fraseLimpa = " " + fraseOriginal.replace(/[.,!?]/g, "") + " ";
+            for (let palavra in IMAGENS_PC) {
+                const regex = new RegExp(`\\b${palavra}\\b`, 'i');
+                if (regex.test(fraseLimpa)) {
+                    dispararEvento(IMAGENS_PC[palavra]);
+                    return; 
+                }
+            }
+        }
+
+        function dispararEvento(imgUrl) {
+            const imgEl = document.getElementById('susto-imagem');
+            const container = document.getElementById('susto-container');
+            const som = document.getElementById('som-boom');
+
+            imgEl.src = imgUrl;
+            container.style.display = 'block'; 
+            
+            som.volume = 1.0;
+            som.currentTime = 0;
+            som.play().catch(e => console.log("Erro som"));
+
+            cooldown = true;
+            setTimeout(() => {
+                container.style.display = 'none';
+                imgEl.src = "";
+                cooldown = false;
+            }, 3000);
+        }
+    </script>
+</body>
+</html>
